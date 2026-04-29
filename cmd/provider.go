@@ -39,7 +39,7 @@ func init() {
 
 	providerAddCmd.Flags().BoolVarP(&providerAddInteractive, "interactive", "i", false, "Interactive mode")
 	providerAddCmd.Flags().StringVarP(&providerAddTokenType, "token-type", "t", "", "Token type (api-key or auth-token)")
-	providerAddCmd.Flags().StringVarP(&providerAddDesc, "description", "d", "", "Description")
+	providerAddCmd.Flags().StringVar(&providerAddDesc, "description", "", "Description")
 
 	providerRemoveCmd.Flags().BoolVar(&providerRemoveYes, "yes", false, "Skip confirmation")
 	providerRenameCmd.Flags().BoolVar(&providerRenameYes, "yes", false, "Skip confirmation")
