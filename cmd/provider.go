@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/spf13/cobra"
 	"github.com/h4ck4life/aix-go/constants"
@@ -102,11 +103,15 @@ func runProviderAdd(cmd *cobra.Command, args []string) error {
 
 	if providerAddInteractive {
 		var err error
-		cfg, _, err = interactive.RunAddProviderWizard()
+		var token string
+		name, cfg, token, err = interactive.RunAddProviderWizard()
 		if err != nil {
 			return err
 		}
-		name = cfg.BaseURL // This will be overwritten below
+		if token != "" {
+			tokenMgr := core.NewTokenManager()
+			_ = tokenMgr.SetToken(name, token)
+		}
 	} else {
 		if len(args) < 2 {
 			return utils.NewValidationError("args", "usage: aix provider add <name> <url>")
@@ -137,14 +142,6 @@ func runProviderAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// For interactive mode, we need to get the name from the wizard
-	if providerAddInteractive {
-		// The wizard doesn't return the name directly, we need to handle this differently
-		// For now, let's just use the first argument or prompt
-		fmt.Println("Interactive mode not fully implemented yet")
-		return nil
-	}
-
 	if err := registry.SetOne(name, *cfg); err != nil {
 		return err
 	}
@@ -170,7 +167,15 @@ func runProviderList(cmd *cobra.Command, args []string) error {
 	headers := []string{"Name", "Base URL", "Token Type", "Custom Model", "Token"}
 	rows := make([][]string, 0, len(providers))
 
-	for name, cfg := range providers {
+	// Sort providers by name for consistent output
+	names := make([]string, 0, len(providers))
+	for name := range providers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		cfg := providers[name]
 		tokenStatus := ui.Cross()
 		if tokenMgr.HasToken(name) {
 			tokenStatus = ui.Checkmark()

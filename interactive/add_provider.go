@@ -22,46 +22,47 @@ type AddProviderWizard struct {
 }
 
 // RunAddProviderWizard runs the interactive add provider wizard
-func RunAddProviderWizard() (*constants.ProviderConfig, string, error) {
+// Returns: name, config, token, error
+func RunAddProviderWizard() (string, *constants.ProviderConfig, string, error) {
 	wizard := &AddProviderWizard{}
 
 	// Step 1: Name
 	nameModel := ui.NewInput("Provider name:", "e.g., my-provider")
 	if _, err := ui.RunPrompt(nameModel); err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 	if nameModel.Cancelled() {
-		return nil, "", fmt.Errorf("cancelled")
+		return "", nil, "", fmt.Errorf("cancelled")
 	}
 	wizard.name = nameModel.Value()
 	if err := validation.ValidateProviderName(wizard.name); err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 
 	// Step 2: URL
 	urlModel := ui.NewInput("Base URL:", "https://api.example.com")
 	if _, err := ui.RunPrompt(urlModel); err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 	if urlModel.Cancelled() {
-		return nil, "", fmt.Errorf("cancelled")
+		return "", nil, "", fmt.Errorf("cancelled")
 	}
 	wizard.url = urlModel.Value()
 	if err := validation.ValidateURL(wizard.url); err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 
 	// Step 3: Token type
 	tokenType, err := ui.RunSelect("Token type:", []string{"api-key", "auth-token"})
 	if err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 	wizard.tokenVar = validation.NormalizeTokenVar(tokenType)
 
 	// Step 4: Description (optional)
 	descModel := ui.NewInput("Description (optional):", "")
 	if _, err := ui.RunPrompt(descModel); err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 	if !descModel.Cancelled() {
 		wizard.description = descModel.Value()
@@ -70,7 +71,7 @@ func RunAddProviderWizard() (*constants.ProviderConfig, string, error) {
 	// Step 5: Custom model (optional)
 	modelModel := ui.NewInput("Custom model (optional):", "e.g., claude-sonnet-4-6")
 	if _, err := ui.RunPrompt(modelModel); err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 	if !modelModel.Cancelled() {
 		wizard.modelName = modelModel.Value()
@@ -84,7 +85,7 @@ func RunAddProviderWizard() (*constants.ProviderConfig, string, error) {
 			fmt.Sprintf("e.g., claude-%s-4-x", alias),
 		)
 		if _, err := ui.RunPrompt(aliasModel); err != nil {
-			return nil, "", err
+			return "", nil, "", err
 		}
 		if !aliasModel.Cancelled() && aliasModel.Value() != "" {
 			aliases[alias] = aliasModel.Value()
@@ -97,7 +98,7 @@ func RunAddProviderWizard() (*constants.ProviderConfig, string, error) {
 	// Step 7: Token (optional)
 	tokenModel := ui.NewSecureInput("Token (optional, press Enter to skip):")
 	if _, err := ui.RunPrompt(tokenModel); err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 
 	cfg := constants.ProviderConfig{
@@ -107,7 +108,7 @@ func RunAddProviderWizard() (*constants.ProviderConfig, string, error) {
 		DefaultModels: wizard.defaultModels,
 	}
 
-	return &cfg, tokenModel.Value(), nil
+	return wizard.name, &cfg, tokenModel.Value(), nil
 }
 
 // DetectTokenType tries to auto-detect token type from URL patterns

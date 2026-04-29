@@ -103,7 +103,6 @@ func checkPermissions() (bool, string) {
 	for _, path := range paths {
 		dir := path
 		if info, err := os.Stat(path); err == nil && !info.IsDir() {
-			dir = path[:len(path)-len("/")]
 			for i := len(path) - 1; i >= 0; i-- {
 				if path[i] == '/' || path[i] == '\\' {
 					dir = path[:i]
