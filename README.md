@@ -17,7 +17,7 @@ which aix
 aix --version
 ```
 
-**System-wide installation** (requires sudo):
+**macOS / Linux system-wide** (requires sudo):
 
 ```bash
 # Build and copy to /usr/local/bin
@@ -25,6 +25,30 @@ go build -o /usr/local/bin/aix .
 
 # Or use the Makefile
 make install
+```
+
+**Windows system-wide** (Administrator PowerShell):
+
+```powershell
+# Build for Windows
+go build -o aix.exe .
+
+# Move to a directory in your PATH
+Move-Item aix.exe C:\Windows\System32\aix.exe
+
+# Or to a user-local bin directory
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\bin"
+Move-Item aix.exe "$env:USERPROFILE\bin\aix.exe"
+
+# Add to PATH (if using user-local bin)
+[Environment]::SetEnvironmentVariable(
+    "Path",
+    [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:USERPROFILE\bin",
+    "User"
+)
+
+# Verify
+aix --version
 ```
 
 ### via Homebrew (macOS/Linux)
