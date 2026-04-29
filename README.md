@@ -58,6 +58,19 @@ brew tap h4ck4life/aix
 brew install aix
 ```
 
+### via Scoop (Windows)
+
+```powershell
+# Add the bucket
+scoop bucket add aix https://github.com/h4ck4life/scoop-bucket.git
+
+# Install
+scoop install aix
+
+# Update later
+scoop update aix
+```
+
 ### Pre-built binaries
 
 Download the latest release for your platform from the [releases page](https://github.com/h4ck4life/aix-go/releases).
@@ -248,13 +261,20 @@ GOOS=darwin GOARCH=arm64 go build -o aix-darwin-arm64 .
 
 ### Release with GoReleaser
 
+Releases are fully automated via GoReleaser. See [RELEASING.md](RELEASING.md) for the complete workflow.
+
+Quick release:
+
 ```bash
-# Install GoReleaser
+# Install GoReleaser (once)
 brew install goreleaser
 
-# Create a release (requires GitHub token)
-goreleaser release --clean
+# Tag and release
+make tag VERSION=v1.0.1
+make release VERSION=v1.0.1
 ```
+
+This builds all 6 platforms, creates a GitHub release, and updates the Homebrew tap automatically.
 
 ## Token Storage
 

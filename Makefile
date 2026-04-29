@@ -61,24 +61,19 @@ tag:
 	git tag -a $(VERSION) -m "Release $(VERSION)"
 	git push origin $(VERSION)
 
-# Build and publish release (usage: make release VERSION=v1.0.0)
-release: build-all
-	@if [ -z "$(VERSION)" ]; then \
-		VERSION=$$(git describe --tags --abbrev=0 2>/dev/null); \
-		if [ -z "$$VERSION" ]; then \
-			echo "No tag found. Create one first: make tag VERSION=v1.0.0"; \
-			exit 1; \
-		fi; \
-		echo "Using latest tag: $$VERSION"; \
-	else \
-		VERSION=$(VERSION); \
+# Publish release with GoReleaser (builds all platforms + GitHub release + Homebrew tap)
+release:
+	@if ! command -v goreleaser >/dev/null 2>&1; then \
+		echo "GoReleaser not found. Install: brew install goreleaser"; \
+		exit 1; \
 	fi; \
-	echo "Publishing release $$VERSION..."; \
-	gh release create $$VERSION $(BUILD_DIR)/* \
-		--repo h4ck4life/aix-go \
-		--title "aix $$VERSION" \
-		--generate-notes \
-		--verify-tag
+	export GITHUB_TOKEN=$$(gh auth token 2>/dev/null); \
+	if [ -z "$$GITHUB_TOKEN" ]; then \
+		echo "GitHub token not available. Run: gh auth login"; \
+		exit 1; \
+	fi; \
+	echo "Publishing release with GoReleaser..."; \
+	goreleaser release --clean
 
 # Clean build artifacts
 clean:
