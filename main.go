@@ -8,7 +8,7 @@ import (
 	"github.com/h4ck4life/aix-go/utils"
 )
 
-const version = "1.0.0"
+var version = "dev"
 
 func main() {
 	if err := cmd.Execute(version); err != nil {

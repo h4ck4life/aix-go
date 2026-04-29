@@ -40,3 +40,22 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^chore:"
+
+brews:
+  - name: aix
+    repository:
+      owner: h4ck4life
+      name: homebrew-aix
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/h4ck4life/aix-go"
+    description: "CLI to switch Anthropic-compatible endpoints and tokens"
+    license: "MIT"
+    install: |
+      bin.install "aix"
+    test: |
+      system "#{bin}/aix", "--version"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
