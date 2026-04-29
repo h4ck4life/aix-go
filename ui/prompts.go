@@ -32,11 +32,11 @@ func NewInput(prompt, placeholder string) *InputModel {
 	}
 }
 
-func (m InputModel) Init() tea.Cmd {
+func (m *InputModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -55,7 +55,7 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m InputModel) View() string {
+func (m *InputModel) View() string {
 	if m.done || m.cancelled {
 		return ""
 	}
@@ -96,11 +96,11 @@ func NewSecureInput(prompt string) *SecureInputModel {
 	}
 }
 
-func (m SecureInputModel) Init() tea.Cmd {
+func (m *SecureInputModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m SecureInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *SecureInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -119,7 +119,7 @@ func (m SecureInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m SecureInputModel) View() string {
+func (m *SecureInputModel) View() string {
 	if m.done || m.cancelled {
 		return ""
 	}
@@ -154,11 +154,11 @@ func NewConfirm(prompt string, defaultYes bool) *ConfirmModel {
 	}
 }
 
-func (m ConfirmModel) Init() tea.Cmd {
+func (m *ConfirmModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m ConfirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *ConfirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -185,7 +185,7 @@ func (m ConfirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m ConfirmModel) View() string {
+func (m *ConfirmModel) View() string {
 	if m.done || m.cancelled {
 		return ""
 	}

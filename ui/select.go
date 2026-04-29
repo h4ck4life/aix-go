@@ -47,11 +47,11 @@ func NewSelect(title string, options []string) *SelectModel {
 	return &SelectModel{list: l}
 }
 
-func (m SelectModel) Init() tea.Cmd {
+func (m *SelectModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m SelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *SelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -72,7 +72,7 @@ func (m SelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m SelectModel) View() string {
+func (m *SelectModel) View() string {
 	if m.done || m.cancelled {
 		return ""
 	}
@@ -96,7 +96,7 @@ func RunSelect(title string, options []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if m, ok := result.(SelectModel); ok {
+	if m, ok := result.(*SelectModel); ok {
 		if m.Cancelled() {
 			return "", fmt.Errorf("cancelled")
 		}

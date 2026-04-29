@@ -28,11 +28,11 @@ func NewSpinner(message string) *SpinnerModel {
 	}
 }
 
-func (m SpinnerModel) Init() tea.Cmd {
+func (m *SpinnerModel) Init() tea.Cmd {
 	return m.spinner.Tick
 }
 
-func (m SpinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *SpinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -46,7 +46,7 @@ func (m SpinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m SpinnerModel) View() string {
+func (m *SpinnerModel) View() string {
 	if m.done {
 		if m.err != nil {
 			return Error(fmt.Sprintf("%s failed: %v\n", m.message, m.err))
