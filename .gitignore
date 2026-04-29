@@ -1,0 +1,22 @@
+# Build output
+build/
+*.exe
+aix
+aix-go
+
+# Go test binary
+*.test
+
+# Go coverage
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Claude Code
+CLAUDE.md
