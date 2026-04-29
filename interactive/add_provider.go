@@ -11,14 +11,14 @@ import (
 
 // AddProviderWizard guides through adding a new provider
 type AddProviderWizard struct {
-	step        int
-	name        string
-	url         string
-	tokenVar    string
-	description string
-	modelName   string
+	step          int
+	name          string
+	url           string
+	tokenVar      string
+	description   string
+	modelName     string
 	defaultModels map[string]string
-	err         error
+	err           error
 }
 
 // RunAddProviderWizard runs the interactive add provider wizard
@@ -59,16 +59,7 @@ func RunAddProviderWizard() (string, *constants.ProviderConfig, string, error) {
 	}
 	wizard.tokenVar = validation.NormalizeTokenVar(tokenType)
 
-	// Step 4: Description (optional)
-	descModel := ui.NewInput("Description (optional):", "")
-	if _, err := ui.RunPrompt(descModel); err != nil {
-		return "", nil, "", err
-	}
-	if !descModel.Cancelled() {
-		wizard.description = descModel.Value()
-	}
-
-	// Step 5: Custom model (optional)
+	// Step 4: Custom model (optional)
 	modelModel := ui.NewInput("Custom model (optional):", "e.g., claude-sonnet-4-6")
 	if _, err := ui.RunPrompt(modelModel); err != nil {
 		return "", nil, "", err
@@ -77,7 +68,7 @@ func RunAddProviderWizard() (string, *constants.ProviderConfig, string, error) {
 		wizard.modelName = modelModel.Value()
 	}
 
-	// Step 6: Default model aliases (optional)
+	// Step 5: Default model aliases (optional)
 	aliases := map[string]string{}
 	for _, alias := range []string{"opus", "sonnet", "haiku", "subagent"} {
 		aliasModel := ui.NewInput(
@@ -95,7 +86,7 @@ func RunAddProviderWizard() (string, *constants.ProviderConfig, string, error) {
 		wizard.defaultModels = aliases
 	}
 
-	// Step 7: Token (optional)
+	// Step 6: Token (optional)
 	tokenModel := ui.NewSecureInput("Token (optional, press Enter to skip):")
 	if _, err := ui.RunPrompt(tokenModel); err != nil {
 		return "", nil, "", err

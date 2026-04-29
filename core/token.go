@@ -15,7 +15,7 @@ import (
 
 // TokenManager handles token storage
 type TokenManager struct {
-	mu        sync.RWMutex
+	mu          sync.RWMutex
 	useKeychain bool
 }
 
@@ -57,13 +57,15 @@ func (tm *TokenManager) SetToken(providerName, token string) error {
 func (tm *TokenManager) DeleteToken(providerName string) error {
 	account := keychain.AccountName(providerName)
 
-	var keychainErr, fileErr error
+	var keychainErr error
 
 	if tm.useKeychain {
 		keychainErr = keychain.Delete(constants.KeychainService, account)
 	}
 
-	fileErr = tm.deleteFromFile(account)
+	tm.mu.Lock()
+	fileErr := tm.deleteFromFile(account)
+	tm.mu.Unlock()
 
 	if keychainErr != nil && fileErr != nil {
 		return utils.NewTokenError(fmt.Sprintf("failed to delete token: keychain=%v, file=%v", keychainErr, fileErr))
@@ -76,7 +78,8 @@ func (tm *TokenManager) DeleteToken(providerName string) error {
 func (tm *TokenManager) MoveToken(oldProvider, newProvider string) error {
 	token, err := tm.GetToken(oldProvider)
 	if err != nil {
-		return err
+		// No token to move; rename should still succeed
+		return nil
 	}
 
 	if err := tm.SetToken(newProvider, token); err != nil {

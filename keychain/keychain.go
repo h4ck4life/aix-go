@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os/user"
 
-	"github.com/zalando/go-keyring"
 	"github.com/h4ck4life/aix-go/constants"
+	"github.com/zalando/go-keyring"
 )
 
 // Get retrieves a token from the OS keychain

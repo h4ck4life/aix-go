@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/h4ck4life/aix-go/constants"
 	"github.com/h4ck4life/aix-go/core"
 	"github.com/h4ck4life/aix-go/ui"
 	"github.com/h4ck4life/aix-go/utils"
+	"github.com/spf13/cobra"
 )
 
 var configCmd = &cobra.Command{

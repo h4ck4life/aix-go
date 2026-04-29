@@ -3,13 +3,14 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/h4ck4life/aix-go/constants"
 	"github.com/h4ck4life/aix-go/core"
 	"github.com/h4ck4life/aix-go/ui"
 	"github.com/h4ck4life/aix-go/utils"
+	"github.com/spf13/cobra"
 )
 
 var tokenCmd = &cobra.Command{
@@ -20,7 +21,7 @@ var tokenCmd = &cobra.Command{
 }
 
 var (
-	tokenSetToken string
+	tokenSetToken  string
 	tokenRemoveYes bool
 )
 
@@ -110,8 +111,13 @@ func runTokenTest(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Testing token for '%s'...\n", name)
 	start := time.Now()
 
+	testURL := cfg.BaseURL
+	if !strings.HasSuffix(testURL, "/v1/models") {
+		testURL = strings.TrimSuffix(testURL, "/") + "/v1/models"
+	}
+
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", cfg.BaseURL, nil)
+	req, err := http.NewRequest("GET", testURL, nil)
 	if err != nil {
 		return err
 	}

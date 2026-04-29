@@ -1,13 +1,16 @@
 package utils
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // Exit codes matching the Node version
 const (
-	ExitSuccess         = 0
-	ExitGeneralError    = 1
-	ExitInvalidArgument = 2
-	ExitFileNotFound    = 3
+	ExitSuccess          = 0
+	ExitGeneralError     = 1
+	ExitInvalidArgument  = 2
+	ExitFileNotFound     = 3
 	ExitPermissionDenied = 4
 )
 
@@ -29,10 +32,19 @@ func (e *AixError) Unwrap() error {
 	return e.Cause
 }
 
+func (e *AixError) ExitCode() int {
+	return e.Code
+}
+
+// coder is implemented by all aix error types
+type coder interface {
+	ExitCode() int
+}
+
 // ValidationError for input validation failures
 type ValidationError struct {
 	AixError
-	Field   string
+	Field string
 }
 
 // NewValidationError creates a validation error
@@ -97,8 +109,8 @@ func NewTokenError(message string) *TokenError {
 
 // IsAixError checks if an error is an AixError
 func IsAixError(err error) bool {
-	_, ok := err.(*AixError)
-	return ok
+	var c coder
+	return errors.As(err, &c)
 }
 
 // GetExitCode returns the exit code for an error
@@ -107,9 +119,9 @@ func GetExitCode(err error) int {
 		return ExitSuccess
 	}
 
-	var aixErr *AixError
-	if AsAixError(err, &aixErr) {
-		return aixErr.Code
+	var c coder
+	if errors.As(err, &c) {
+		return c.ExitCode()
 	}
 
 	return ExitGeneralError
@@ -121,34 +133,34 @@ func AsAixError(err error, target **AixError) bool {
 		return false
 	}
 
-	// Try direct match
-	if e, ok := err.(*AixError); ok {
+	// Try each concrete type since embedded types are not assignable to *AixError
+	switch e := err.(type) {
+	case *AixError:
 		*target = e
+		return true
+	case *ValidationError:
+		*target = &e.AixError
+		return true
+	case *FileNotFoundError:
+		*target = &e.AixError
+		return true
+	case *PermissionDeniedError:
+		*target = &e.AixError
+		return true
+	case *TokenError:
+		*target = &e.AixError
 		return true
 	}
 
 	// Try wrapped errors
-	for {
-		unwrapped := Unwrap(err)
-		if unwrapped == nil {
-			return false
-		}
-		if e, ok := unwrapped.(*AixError); ok {
-			*target = e
-			return true
-		}
-		err = unwrapped
+	if unwrapped := errors.Unwrap(err); unwrapped != nil {
+		return AsAixError(unwrapped, target)
 	}
+
+	return false
 }
 
 // Unwrap returns the wrapped error
 func Unwrap(err error) error {
-	type unwrapper interface {
-		Unwrap() error
-	}
-
-	if e, ok := err.(unwrapper); ok {
-		return e.Unwrap()
-	}
-	return nil
+	return errors.Unwrap(err)
 }

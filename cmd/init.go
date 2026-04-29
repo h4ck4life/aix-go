@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"github.com/h4ck4life/aix-go/interactive"
+	"github.com/spf13/cobra"
 )
 
 var initCmd = &cobra.Command{

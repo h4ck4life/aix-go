@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/h4ck4life/aix-go/constants"
 	"github.com/h4ck4life/aix-go/core"
 	"github.com/h4ck4life/aix-go/ui"
+	"github.com/spf13/cobra"
 )
 
 var doctorCmd = &cobra.Command{
@@ -100,26 +101,30 @@ func checkPermissions() (bool, string) {
 		constants.TokenDir(),
 	}
 
+	var missing []string
 	for _, path := range paths {
 		dir := path
-		if info, err := os.Stat(path); err == nil && !info.IsDir() {
-			for i := len(path) - 1; i >= 0; i-- {
-				if path[i] == '/' || path[i] == '\\' {
-					dir = path[:i]
-					break
-				}
+		if info, err := os.Stat(path); err == nil {
+			if !info.IsDir() {
+				dir = filepath.Dir(path)
 			}
+		} else {
+			// Path doesn't exist; check parent directory
+			dir = filepath.Dir(path)
+			missing = append(missing, filepath.Base(path))
 		}
-		if _, err := os.Stat(dir); err == nil {
-			// Directory exists, check writability
-			testFile := dir + "/.aix-write-test"
-			if f, err := os.Create(testFile); err == nil {
-				f.Close()
-				os.Remove(testFile)
-			} else {
-				return false, fmt.Sprintf("cannot write to %s", dir)
-			}
+
+		testFile := filepath.Join(dir, ".aix-write-test")
+		if f, err := os.Create(testFile); err == nil {
+			f.Close()
+			os.Remove(testFile)
+		} else {
+			return false, fmt.Sprintf("cannot write to %s", dir)
 		}
+	}
+
+	if len(missing) > 0 {
+		return true, fmt.Sprintf("All directories writable (%d path(s) will be created: %v)", len(missing), missing)
 	}
 	return true, "All directories writable"
 }

@@ -71,9 +71,13 @@ func RenderSimpleTable(headers []string, rows [][]string) string {
 
 	// Data rows
 	for _, row := range rows {
-		for i, cell := range row {
+		for i := range headers {
 			if i > 0 {
 				sb.WriteString("  ")
+			}
+			cell := ""
+			if i < len(row) {
+				cell = row[i]
 			}
 			sb.WriteString(padRight(cell, colWidths[i]))
 		}

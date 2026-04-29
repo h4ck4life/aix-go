@@ -19,11 +19,11 @@ const (
 	RegistryCacheTTL = 5
 
 	// Shell types
-	ShellBash      = "bash"
-	ShellZsh       = "zsh"
-	ShellFish      = "fish"
+	ShellBash       = "bash"
+	ShellZsh        = "zsh"
+	ShellFish       = "fish"
 	ShellPowerShell = "powershell"
-	ShellCmd       = "cmd"
+	ShellCmd        = "cmd"
 )
 
 // Model alias keys
@@ -36,14 +36,14 @@ const (
 
 // Environment variable names
 const (
-	EnvAnthropicBaseURL       = "ANTHROPIC_BASE_URL"
-	EnvAnthropicAPIKey        = "ANTHROPIC_API_KEY"
-	EnvAnthropicAuthToken     = "ANTHROPIC_AUTH_TOKEN"
-	EnvAnthropicModel         = "ANTHROPIC_MODEL"
-	EnvDefaultOpusModel       = "ANTHROPIC_DEFAULT_OPUS_MODEL"
-	EnvDefaultSonnetModel     = "ANTHROPIC_DEFAULT_SONNET_MODEL"
-	EnvDefaultHaikuModel      = "ANTHROPIC_DEFAULT_HAIKU_MODEL"
-	EnvDefaultSubagentModel   = "CLAUDE_CODE_SUBAGENT_MODEL"
+	EnvAnthropicBaseURL     = "ANTHROPIC_BASE_URL"
+	EnvAnthropicAPIKey      = "ANTHROPIC_API_KEY"
+	EnvAnthropicAuthToken   = "ANTHROPIC_AUTH_TOKEN"
+	EnvAnthropicModel       = "ANTHROPIC_MODEL"
+	EnvDefaultOpusModel     = "ANTHROPIC_DEFAULT_OPUS_MODEL"
+	EnvDefaultSonnetModel   = "ANTHROPIC_DEFAULT_SONNET_MODEL"
+	EnvDefaultHaikuModel    = "ANTHROPIC_DEFAULT_HAIKU_MODEL"
+	EnvDefaultSubagentModel = "CLAUDE_CODE_SUBAGENT_MODEL"
 )
 
 // Token types
@@ -60,24 +60,24 @@ var (
 // Pre-configured providers
 var PreconfiguredProviders = map[string]ProviderConfig{
 	"ccpro": {
-		BaseURL:   "https://cc.malif.dev/ccpro",
-		TokenVar:  TokenTypeAPIKey,
+		BaseURL:  "https://cc.malif.dev/ccpro",
+		TokenVar: TokenTypeAPIKey,
 	},
 	"ccprotwo": {
-		BaseURL:   "https://cc.malif.dev/ccprotwo",
-		TokenVar:  TokenTypeAuthToken,
+		BaseURL:  "https://cc.malif.dev/ccprotwo",
+		TokenVar: TokenTypeAuthToken,
 	},
 	"kimi": {
-		BaseURL:   "https://cc.malif.dev/moonshot",
-		TokenVar:  TokenTypeAuthToken,
+		BaseURL:  "https://cc.malif.dev/moonshot",
+		TokenVar: TokenTypeAuthToken,
 	},
 	"minimax": {
-		BaseURL:   "https://api.minimax.io/anthropic",
-		TokenVar:  TokenTypeAuthToken,
+		BaseURL:  "https://api.minimax.io/anthropic",
+		TokenVar: TokenTypeAuthToken,
 	},
 	"zai": {
-		BaseURL:   "https://cc.malif.dev/zai",
-		TokenVar:  TokenTypeAuthToken,
+		BaseURL:  "https://cc.malif.dev/zai",
+		TokenVar: TokenTypeAuthToken,
 	},
 }
 

@@ -15,10 +15,10 @@ import (
 
 // Registry manages provider configurations with caching
 type Registry struct {
-	mu        sync.RWMutex
-	data      map[string]constants.ProviderConfig
-	loadedAt  time.Time
-	cacheTTL  time.Duration
+	mu       sync.RWMutex
+	data     map[string]constants.ProviderConfig
+	loadedAt time.Time
+	cacheTTL time.Duration
 }
 
 // NewRegistry creates a new registry instance
@@ -71,7 +71,7 @@ func (r *Registry) saveLocked() error {
 		return err
 	}
 
-	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
 		return err
 	}
 

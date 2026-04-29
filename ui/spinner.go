@@ -32,6 +32,8 @@ func (m *SpinnerModel) Init() tea.Cmd {
 	return m.spinner.Tick
 }
 
+type spinnerDoneMsg struct{}
+
 func (m *SpinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
@@ -42,6 +44,8 @@ func (m *SpinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Type == tea.KeyCtrlC {
 			return m, tea.Quit
 		}
+	case spinnerDoneMsg:
+		return m, tea.Quit
 	}
 	return m, nil
 }
@@ -71,7 +75,7 @@ func RunSpinner(message string, done func() (string, error)) error {
 	go func() {
 		result, err := done()
 		m.SetDone(result, err)
-		p.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+		p.Send(spinnerDoneMsg{})
 	}()
 
 	_, err := p.Run()

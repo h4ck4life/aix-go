@@ -3,14 +3,15 @@ package cmd
 import (
 	"fmt"
 	"sort"
+	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/h4ck4life/aix-go/constants"
 	"github.com/h4ck4life/aix-go/core"
 	"github.com/h4ck4life/aix-go/interactive"
 	"github.com/h4ck4life/aix-go/ui"
 	"github.com/h4ck4life/aix-go/utils"
 	"github.com/h4ck4life/aix-go/validation"
+	"github.com/spf13/cobra"
 )
 
 var providerCmd = &cobra.Command{
@@ -23,10 +24,15 @@ var providerCmd = &cobra.Command{
 var (
 	providerAddInteractive bool
 	providerAddTokenType   string
-	providerAddDesc        string
 	providerRemoveYes      bool
 	providerRenameYes      bool
 	providerUseShell       string
+	providerUsePersist     bool
+
+	providerEditURL          string
+	providerEditTokenType    string
+	providerEditModel        string
+	providerEditDefaultModel string
 )
 
 func init() {
@@ -37,14 +43,20 @@ func init() {
 	providerCmd.AddCommand(providerUseCmd)
 	providerCmd.AddCommand(providerSetModelCmd)
 	providerCmd.AddCommand(providerSetDefaultCmd)
+	providerCmd.AddCommand(providerEditCmd)
 
 	providerAddCmd.Flags().BoolVarP(&providerAddInteractive, "interactive", "i", false, "Interactive mode")
 	providerAddCmd.Flags().StringVarP(&providerAddTokenType, "token-type", "t", "", "Token type (api-key or auth-token)")
-	providerAddCmd.Flags().StringVar(&providerAddDesc, "description", "", "Description")
 
 	providerRemoveCmd.Flags().BoolVar(&providerRemoveYes, "yes", false, "Skip confirmation")
 	providerRenameCmd.Flags().BoolVar(&providerRenameYes, "yes", false, "Skip confirmation")
 	providerUseCmd.Flags().StringVar(&providerUseShell, "shell", "", "Output shell export commands")
+	providerUseCmd.Flags().BoolVar(&providerUsePersist, "persist", false, "Persist environment variables to settings.json")
+
+	providerEditCmd.Flags().StringVar(&providerEditURL, "url", "", "New base URL")
+	providerEditCmd.Flags().StringVar(&providerEditTokenType, "token-type", "", "New token type (api-key or auth-token)")
+	providerEditCmd.Flags().StringVar(&providerEditModel, "model", "", "New custom model")
+	providerEditCmd.Flags().StringVar(&providerEditDefaultModel, "default-model", "", "Set default model alias (format: alias=model)")
 }
 
 var providerAddCmd = &cobra.Command{
@@ -90,6 +102,12 @@ var providerSetDefaultCmd = &cobra.Command{
 	Use:   "set-default [name] [alias] [model]",
 	Short: "Set default model alias (opus, sonnet, haiku, subagent)",
 	RunE:  runProviderSetDefault,
+}
+
+var providerEditCmd = &cobra.Command{
+	Use:   "edit [name]",
+	Short: "Edit an existing provider",
+	RunE:  runProviderEdit,
 }
 
 func runProviderAdd(cmd *cobra.Command, args []string) error {
@@ -296,6 +314,12 @@ func runProviderUse(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if providerUsePersist {
+		if err := settings.Write(); err != nil {
+			return err
+		}
+	}
+
 	fmt.Print(settings.FormatForShell(shell))
 	return nil
 }
@@ -339,5 +363,73 @@ func runProviderSetDefault(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println(ui.Success(fmt.Sprintf("Set default %s model '%s' for provider '%s'", alias, model, name)))
+	return nil
+}
+
+func runProviderEdit(cmd *cobra.Command, args []string) error {
+	if len(args) < 1 {
+		return utils.NewValidationError("args", "usage: aix provider edit <name>")
+	}
+	name := args[0]
+
+	registry := core.NewRegistry()
+	if err := registry.Load(); err != nil {
+		return err
+	}
+
+	cfg, err := registry.GetOne(name)
+	if err != nil {
+		return err
+	}
+
+	modified := false
+
+	if providerEditURL != "" {
+		if err := validation.ValidateURL(providerEditURL); err != nil {
+			return err
+		}
+		cfg.BaseURL = providerEditURL
+		modified = true
+	}
+
+	if providerEditTokenType != "" {
+		tokenVar := validation.NormalizeTokenVar(providerEditTokenType)
+		if err := validation.ValidateTokenVar(tokenVar); err != nil {
+			return err
+		}
+		cfg.TokenVar = tokenVar
+		modified = true
+	}
+
+	if providerEditModel != "" {
+		cfg.ModelName = providerEditModel
+		modified = true
+	}
+
+	if providerEditDefaultModel != "" {
+		parts := strings.SplitN(providerEditDefaultModel, "=", 2)
+		if len(parts) != 2 {
+			return utils.NewValidationError("default-model", "format must be alias=model")
+		}
+		alias, model := parts[0], parts[1]
+		if err := validation.ValidateModelAlias(alias); err != nil {
+			return err
+		}
+		if cfg.DefaultModels == nil {
+			cfg.DefaultModels = make(map[string]string)
+		}
+		cfg.DefaultModels[alias] = model
+		modified = true
+	}
+
+	if !modified {
+		return utils.NewValidationError("args", "no changes specified; use --url, --token-type, --model, or --default-model")
+	}
+
+	if err := registry.SetOne(name, cfg); err != nil {
+		return err
+	}
+
+	fmt.Println(ui.Success(fmt.Sprintf("Provider '%s' updated", name)))
 	return nil
 }

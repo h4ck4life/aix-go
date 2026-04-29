@@ -138,11 +138,11 @@ func (m SecureInputModel) Cancelled() bool {
 
 // ConfirmModel is a yes/no confirmation prompt
 type ConfirmModel struct {
-	prompt    string
+	prompt     string
 	defaultYes bool
-	value     bool
-	done      bool
-	cancelled bool
+	value      bool
+	done       bool
+	cancelled  bool
 }
 
 // NewConfirm creates a new confirmation prompt

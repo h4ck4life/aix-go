@@ -84,6 +84,8 @@ Download the latest release for your platform from the [releases page](https://g
 - **Cross-Platform**: Works on macOS, Linux, and Windows
 - **Shell Auto-Detection**: Automatically detects bash, zsh, fish, PowerShell, and CMD
 - **Zero Config Modification**: Sets env vars in your current shell session — no files touched
+- **Optional Persistence**: Save active provider to `~/.claude/settings.json` with `--persist`
+- **Provider Editing**: Modify existing providers without remove+re-add
 
 ## Usage
 
@@ -108,6 +110,9 @@ aix provider rename old-name new-name
 # Set active provider (outputs shell exports)
 eval $(aix provider use my-provider)
 
+# Persist to ~/.claude/settings.json
+aix provider use my-provider --persist
+
 # Explicit shell syntax
 eval $(aix provider use my-provider --shell zsh)
 eval $(aix provider use my-provider --shell fish)
@@ -117,6 +122,12 @@ Invoke-Expression (aix provider use my-provider --shell powershell | Out-String)
 
 # CMD
 for /f "tokens=*" %a in ('aix provider use my-provider --shell cmd') do @%a
+
+# Edit an existing provider
+aix provider edit my-provider --url https://api.new.com
+aix provider edit my-provider --token-type auth-token
+aix provider edit my-provider --model claude-sonnet-4-6
+aix provider edit my-provider --default-model sonnet=claude-sonnet-4-6
 
 # Set custom model
 aix provider set-model my-provider claude-sonnet-4-6
@@ -161,17 +172,26 @@ aix init
 
 # Run diagnostics
 aix doctor
+
+# Print version
+aix version
+aix --version
 ```
 
 ## How It Works
 
-Unlike the Node.js version, the Go rewrite does **not** modify `~/.claude/settings.json`. Instead:
+By default, `aix provider use <name>` outputs `export` commands to stdout:
 
-1. `aix provider use <name>` outputs `export` commands to stdout
-2. You wrap it with `eval $(...)` to set env vars in your current shell session
-3. Claude Code picks up the env vars when run in the same session
+1. You wrap it with `eval $(...)` to set env vars in your current shell session
+2. Claude Code picks up the env vars when run in the same session
 
 This is cleaner, more transparent, and follows the Unix philosophy.
+
+To persist the active provider to `~/.claude/settings.json` (so Claude Code uses it automatically):
+
+```bash
+aix provider use my-provider --persist
+```
 
 ### Shell Integration (Optional)
 

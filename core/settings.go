@@ -11,6 +11,19 @@ import (
 	"github.com/h4ck4life/aix-go/utils"
 )
 
+// shellQuote returns a shell-safe quoted string for the given shell.
+func shellQuote(shell, value string) string {
+	switch shell {
+	case constants.ShellPowerShell:
+		return "\"" + strings.ReplaceAll(value, "\"", "`\"") + "\""
+	case constants.ShellCmd:
+		return value
+	default:
+		// bash, zsh, fish: use single quotes, escape single quotes
+		return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+	}
+}
+
 // Settings represents Claude Code's settings.json
 type Settings struct {
 	Env map[string]string `json:"env,omitempty"`
@@ -53,7 +66,7 @@ func (s *Settings) Write() error {
 		return err
 	}
 
-	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
 		return err
 	}
 
@@ -108,15 +121,16 @@ func (s *Settings) GenerateEnvironmentVars(providerName string, provider constan
 func (s *Settings) FormatForShell(shell string) string {
 	var sb strings.Builder
 	for key, value := range s.Env {
+		quoted := shellQuote(shell, value)
 		switch shell {
 		case constants.ShellFish:
-			sb.WriteString(fmt.Sprintf("set -x %s %s\n", key, value))
+			sb.WriteString(fmt.Sprintf("set -x %s %s\n", key, quoted))
 		case constants.ShellPowerShell:
-			sb.WriteString(fmt.Sprintf("$env:%s = \"%s\"\n", key, value))
+			sb.WriteString(fmt.Sprintf("$env:%s = %s\n", key, quoted))
 		case constants.ShellCmd:
-			sb.WriteString(fmt.Sprintf("set %s=%s\n", key, value))
+			sb.WriteString(fmt.Sprintf("set %s=%s\n", key, quoted))
 		default:
-			sb.WriteString(fmt.Sprintf("export %s=%s\n", key, value))
+			sb.WriteString(fmt.Sprintf("export %s=%s\n", key, quoted))
 		}
 	}
 	return sb.String()
