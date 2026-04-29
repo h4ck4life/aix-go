@@ -54,12 +54,7 @@ var configImportCmd = &cobra.Command{
 }
 
 func runConfigCurrent(cmd *cobra.Command, args []string) error {
-	settings := &core.Settings{}
-	if err := settings.Read(); err != nil {
-		return err
-	}
-
-	env := settings.GetCurrentEnvironment()
+	env := readAnthropicEnv()
 	if len(env) == 0 {
 		fmt.Println("No active provider configured")
 		return nil
@@ -73,6 +68,26 @@ func runConfigCurrent(cmd *cobra.Command, args []string) error {
 
 	fmt.Println(ui.RenderSimpleTable(headers, rows))
 	return nil
+}
+
+func readAnthropicEnv() map[string]string {
+	keys := []string{
+		constants.EnvAnthropicBaseURL,
+		constants.EnvAnthropicAPIKey,
+		constants.EnvAnthropicAuthToken,
+		constants.EnvAnthropicModel,
+		constants.EnvDefaultOpusModel,
+		constants.EnvDefaultSonnetModel,
+		constants.EnvDefaultHaikuModel,
+		constants.EnvDefaultSubagentModel,
+	}
+	env := make(map[string]string)
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			env[k] = v
+		}
+	}
+	return env
 }
 
 func runConfigExport(cmd *cobra.Command, args []string) error {

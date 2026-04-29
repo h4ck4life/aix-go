@@ -66,15 +66,10 @@ func checkRegistry() (bool, string) {
 }
 
 func checkSettings() (bool, string) {
-	settings := &core.Settings{}
-	if err := settings.Read(); err != nil {
-		return false, err.Error()
+	url := os.Getenv(constants.EnvAnthropicBaseURL)
+	if url == "" {
+		return true, "No active provider (ANTHROPIC_BASE_URL not set)"
 	}
-	env := settings.GetCurrentEnvironment()
-	if len(env) == 0 {
-		return true, "No active provider"
-	}
-	url := env[constants.EnvAnthropicBaseURL]
 	return true, fmt.Sprintf("Active: %s", url)
 }
 

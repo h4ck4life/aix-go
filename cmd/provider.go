@@ -27,7 +27,6 @@ var (
 	providerRemoveYes      bool
 	providerRenameYes      bool
 	providerUseShell       string
-	providerUsePersist     bool
 
 	providerEditURL          string
 	providerEditTokenType    string
@@ -51,7 +50,6 @@ func init() {
 	providerRemoveCmd.Flags().BoolVar(&providerRemoveYes, "yes", false, "Skip confirmation")
 	providerRenameCmd.Flags().BoolVar(&providerRenameYes, "yes", false, "Skip confirmation")
 	providerUseCmd.Flags().StringVar(&providerUseShell, "shell", "", "Output shell export commands")
-	providerUseCmd.Flags().BoolVar(&providerUsePersist, "persist", false, "Persist environment variables to settings.json")
 
 	providerEditCmd.Flags().StringVar(&providerEditURL, "url", "", "New base URL")
 	providerEditCmd.Flags().StringVar(&providerEditTokenType, "token-type", "", "New token type (api-key or auth-token)")
@@ -312,12 +310,6 @@ func runProviderUse(cmd *cobra.Command, args []string) error {
 	}
 	if err := validation.ValidateShell(shell); err != nil {
 		return err
-	}
-
-	if providerUsePersist {
-		if err := settings.Write(); err != nil {
-			return err
-		}
 	}
 
 	fmt.Print(settings.FormatForShell(shell))

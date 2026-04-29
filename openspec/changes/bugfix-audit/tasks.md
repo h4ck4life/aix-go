@@ -34,5 +34,5 @@
 - [x] 6.1 Update `CLAUDE.md` to reflect new commands and fixed behavior
 - [x] 6.2 Update `README.md` with new `provider edit`, `version`, and `--persist` usage
 - [x] 6.3 Run `make fmt`, `go vet ./...`, `go test ./...`
-- [ ] 6.4 Git commit and push
-- [ ] 6.5 Create and push release tag, publish via GoReleaser
+- [x] 6.4 Git commit and push
+- [x] 6.5 Create and push release tag, publish via GoReleaser

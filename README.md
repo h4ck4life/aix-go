@@ -84,7 +84,6 @@ Download the latest release for your platform from the [releases page](https://g
 - **Cross-Platform**: Works on macOS, Linux, and Windows
 - **Shell Auto-Detection**: Automatically detects bash, zsh, fish, PowerShell, and CMD
 - **Zero Config Modification**: Sets env vars in your current shell session — no files touched
-- **Optional Persistence**: Save active provider to `~/.claude/settings.json` with `--persist`
 - **Provider Editing**: Modify existing providers without remove+re-add
 
 ## Usage
@@ -109,9 +108,6 @@ aix provider rename old-name new-name
 
 # Set active provider (outputs shell exports)
 eval $(aix provider use my-provider)
-
-# Persist to ~/.claude/settings.json
-aix provider use my-provider --persist
 
 # Explicit shell syntax
 eval $(aix provider use my-provider --shell zsh)
@@ -180,18 +176,12 @@ aix --version
 
 ## How It Works
 
-By default, `aix provider use <name>` outputs `export` commands to stdout:
+`aix provider use <name>` outputs `export` commands to stdout:
 
 1. You wrap it with `eval $(...)` to set env vars in your current shell session
 2. Claude Code picks up the env vars when run in the same session
 
 This is cleaner, more transparent, and follows the Unix philosophy.
-
-To persist the active provider to `~/.claude/settings.json` (so Claude Code uses it automatically):
-
-```bash
-aix provider use my-provider --persist
-```
 
 ### Shell Integration (Optional)
 
@@ -199,11 +189,11 @@ Add this to your `.zshrc` or `.bashrc` for seamless switching:
 
 ```bash
 aix-use() {
-    eval $(aix provider use "$1")
+    eval $(aix provider use "$@")
 }
 ```
 
-Then use `aix-use ccpro` instead of `eval $(aix provider use ccpro)`.
+Then use `aix-use ccpro` instead of `eval $(aix provider use ccpro)`. All flags pass through to `aix provider use`.
 
 ## Configuration Files
 
