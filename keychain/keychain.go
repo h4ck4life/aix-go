@@ -2,6 +2,7 @@ package keychain
 
 import (
 	"fmt"
+	"os"
 	"os/user"
 
 	"github.com/h4ck4life/aix-go/constants"
@@ -34,7 +35,7 @@ func AccountName(providerName string) string {
 
 // IsAvailable checks if the OS keychain is available
 func IsAvailable() bool {
-	testAccount := fmt.Sprintf("aix-test-%d", 0)
+	testAccount := fmt.Sprintf("aix-test-%d", os.Getpid())
 	_ = Delete(constants.KeychainService, testAccount)
 	err := Set(constants.KeychainService, testAccount, "test")
 	if err != nil {

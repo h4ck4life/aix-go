@@ -15,9 +15,23 @@ import (
 func shellQuote(shell, value string) string {
 	switch shell {
 	case constants.ShellPowerShell:
-		return "\"" + strings.ReplaceAll(value, "\"", "`\"") + "\""
+		// Single-quote wrapping: everything is literal.
+		// Escape embedded single quotes as '' (double-single-quote).
+		escaped := strings.ReplaceAll(value, "'", "''")
+		return "'" + escaped + "'"
 	case constants.ShellCmd:
-		return value
+		// CMD has limited escaping. Use ^ for metacharacters and %% for %.
+		// Wrap in double quotes to handle spaces and special characters.
+		escaped := value
+		// Escape CMD metacharacters with ^
+		for _, ch := range []string{"^", "&", "|", "<", ">"} {
+			escaped = strings.ReplaceAll(escaped, ch, "^"+ch)
+		}
+		// Escape % as %%
+		escaped = strings.ReplaceAll(escaped, "%", "%%")
+		// Escape " as ^"
+		escaped = strings.ReplaceAll(escaped, `"`, `^"`)
+		return `"` + escaped + `"`
 	default:
 		// bash, zsh, fish: use single quotes, escape single quotes
 		return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"

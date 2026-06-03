@@ -10,6 +10,7 @@ import (
 	"github.com/h4ck4life/aix-go/constants"
 	"github.com/h4ck4life/aix-go/core"
 	"github.com/h4ck4life/aix-go/ui"
+	"github.com/h4ck4life/aix-go/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -51,6 +52,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		fmt.Println(ui.Success("All checks passed!"))
 	} else {
 		fmt.Println(ui.Warning(fmt.Sprintf("%d check(s) failed", failed)))
+		return utils.WrapError(fmt.Sprintf("%d diagnostic check(s) failed", failed), nil)
 	}
 
 	return nil

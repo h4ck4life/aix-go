@@ -107,6 +107,16 @@ func NewTokenError(message string) *TokenError {
 	}
 }
 
+// WrapError wraps any error in a generic AixError with ExitGeneralError.
+// Use this for errors that don't fit a specific error category.
+func WrapError(message string, err error) error {
+	return &AixError{
+		Code:    ExitGeneralError,
+		Message: message,
+		Cause:   err,
+	}
+}
+
 // IsAixError checks if an error is an AixError
 func IsAixError(err error) bool {
 	var c coder

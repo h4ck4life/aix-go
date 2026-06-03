@@ -136,17 +136,17 @@ func runProviderAdd(cmd *cobra.Command, args []string) error {
 		baseURL := args[1]
 
 		if err := validation.ValidateProviderName(name); err != nil {
-			return err
+			return utils.NewValidationError("name", err.Error())
 		}
 		if err := validation.ValidateURL(baseURL); err != nil {
-			return err
+			return utils.NewValidationError("url", err.Error())
 		}
 
 		tokenVar := constants.TokenTypeAPIKey
 		if providerAddTokenType != "" {
 			tokenVar = validation.NormalizeTokenVar(providerAddTokenType)
 			if err := validation.ValidateTokenVar(tokenVar); err != nil {
-				return err
+				return utils.NewValidationError("token-type", err.Error())
 			}
 		} else {
 			tokenVar = interactive.DetectTokenType(baseURL)
@@ -309,7 +309,7 @@ func runProviderUse(cmd *cobra.Command, args []string) error {
 		shell = constants.DetectShell()
 	}
 	if err := validation.ValidateShell(shell); err != nil {
-		return err
+		return utils.NewValidationError("shell", err.Error())
 	}
 
 	fmt.Print(settings.FormatForShell(shell))
@@ -342,7 +342,7 @@ func runProviderSetDefault(cmd *cobra.Command, args []string) error {
 	name, alias, model := args[0], args[1], args[2]
 
 	if err := validation.ValidateModelAlias(alias); err != nil {
-		return err
+		return utils.NewValidationError("alias", err.Error())
 	}
 
 	registry := core.NewRegistry()
@@ -378,7 +378,7 @@ func runProviderEdit(cmd *cobra.Command, args []string) error {
 
 	if providerEditURL != "" {
 		if err := validation.ValidateURL(providerEditURL); err != nil {
-			return err
+			return utils.NewValidationError("url", err.Error())
 		}
 		cfg.BaseURL = providerEditURL
 		modified = true
@@ -387,7 +387,7 @@ func runProviderEdit(cmd *cobra.Command, args []string) error {
 	if providerEditTokenType != "" {
 		tokenVar := validation.NormalizeTokenVar(providerEditTokenType)
 		if err := validation.ValidateTokenVar(tokenVar); err != nil {
-			return err
+			return utils.NewValidationError("token-type", err.Error())
 		}
 		cfg.TokenVar = tokenVar
 		modified = true
@@ -405,7 +405,7 @@ func runProviderEdit(cmd *cobra.Command, args []string) error {
 		}
 		alias, model := parts[0], parts[1]
 		if err := validation.ValidateModelAlias(alias); err != nil {
-			return err
+			return utils.NewValidationError("alias", err.Error())
 		}
 		if cfg.DefaultModels == nil {
 			cfg.DefaultModels = make(map[string]string)

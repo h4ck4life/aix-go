@@ -42,6 +42,7 @@ func (r *Registry) Load() error {
 			for name, cfg := range constants.PreconfiguredProviders {
 				r.data[name] = cfg
 			}
+			r.loadedAt = time.Now()
 			return r.saveLocked()
 		}
 		return utils.NewFileNotFoundError(path)

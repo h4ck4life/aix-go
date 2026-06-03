@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -13,6 +14,9 @@ import (
 
 	"github.com/h4ck4life/aix-go/constants"
 )
+
+// errDecryptionFailed is the generic error returned for all decryption failures.
+var errDecryptionFailed = errors.New("decryption failed")
 
 // Encrypt encrypts plaintext with AES-256-CBC using the key from ~/.aix/key
 func Encrypt(plaintext string) (string, error) {
@@ -51,33 +55,51 @@ func Decrypt(ciphertext string) (string, error) {
 
 	data, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
-		return "", err
+		return "", errDecryptionFailed
 	}
 
 	if len(data) < aes.BlockSize {
-		return "", errors.New("ciphertext too short")
+		return "", errDecryptionFailed
 	}
 
 	iv := data[:aes.BlockSize]
 	data = data[aes.BlockSize:]
 
+	if len(data)%aes.BlockSize != 0 {
+		return "", errDecryptionFailed
+	}
+
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", err
+		return "", errDecryptionFailed
 	}
 
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(data, data)
 
-	// Remove PKCS7 padding
+	// Constant-time PKCS7 padding validation
 	padding := int(data[len(data)-1])
-	if padding > aes.BlockSize || padding == 0 {
-		return "", errors.New("invalid padding")
+
+	// Check all potential padding bytes unconditionally.
+	// For positions within the padding range, verify they equal the padding value.
+	// Accumulate mismatches so we never short-circuit.
+	var mismatch int
+	for i := 0; i < aes.BlockSize; i++ {
+		b := int(data[len(data)-1-i])
+		// 1 if this byte is within the padding range, 0 otherwise
+		inRange := subtle.ConstantTimeLessOrEq(i, padding-1)
+		// XOR: 0 if b == padding, non-zero otherwise
+		xor := b ^ padding
+		// Only count mismatches for bytes in the padding range
+		mismatch |= subtle.ConstantTimeSelect(inRange, xor, 0)
 	}
-	for i := len(data) - padding; i < len(data); i++ {
-		if int(data[i]) != padding {
-			return "", errors.New("invalid padding")
-		}
+
+	// padding must be 1..BlockSize
+	validRange := subtle.ConstantTimeLessOrEq(1, padding) & subtle.ConstantTimeLessOrEq(padding, aes.BlockSize)
+
+	// validRange==1 and mismatch==0 means valid padding
+	if validRange&int(subtle.ConstantTimeEq(int32(0), int32(mismatch))) != 1 {
+		return "", errDecryptionFailed
 	}
 
 	return string(data[:len(data)-padding]), nil

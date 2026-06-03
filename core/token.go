@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -118,25 +119,24 @@ func (tm *TokenManager) getFromFile(account string) (string, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
+		// Account names contain colons (format: "username:provider"),
+		// so split at the LAST colon to separate account from encrypted value.
+		idx := strings.LastIndex(line, ":")
+		if idx < 0 {
 			continue
 		}
-		if parts[0] == account {
-			return crypto.Decrypt(parts[1])
+		if line[:idx] == account {
+			return crypto.Decrypt(line[idx+1:])
 		}
 	}
 
 	return "", utils.NewTokenError(fmt.Sprintf("token not found for %s", account))
 }
 
-// setInFile stores a token in the encrypted file
+// setInFile stores a token in the encrypted file using a single atomic read-modify-write.
 func (tm *TokenManager) setInFile(account, token string) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
-
-	// Remove existing entry first
-	_ = tm.deleteFromFile(account)
 
 	encrypted, err := crypto.Encrypt(token)
 	if err != nil {
@@ -144,21 +144,36 @@ func (tm *TokenManager) setInFile(account, token string) error {
 	}
 
 	path := constants.TokenEncPath()
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
+	newEntry := fmt.Sprintf("%s:%s", account, encrypted)
+
+	// Read existing lines
+	lines, err := tm.readFileLines(path)
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	defer file.Close()
 
-	_, err = fmt.Fprintf(file, "%s:%s\n", account, encrypted)
-	return err
+	// Replace existing entry or append
+	replaced := false
+	for i, line := range lines {
+		idx := strings.LastIndex(line, ":")
+		if idx >= 0 && line[:idx] == account {
+			lines[i] = newEntry
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		lines = append(lines, newEntry)
+	}
+
+	return tm.writeFileAtomically(path, lines)
 }
 
-// deleteFromFile removes a token from the encrypted file
+// deleteFromFile removes a token from the encrypted file using atomic writes.
 func (tm *TokenManager) deleteFromFile(account string) error {
 	path := constants.TokenEncPath()
 
-	data, err := os.ReadFile(path)
+	lines, err := tm.readFileLines(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -166,14 +181,10 @@ func (tm *TokenManager) deleteFromFile(account string) error {
 		return err
 	}
 
-	lines := strings.Split(string(data), "\n")
 	var kept []string
 	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) == 2 && parts[0] == account {
+		idx := strings.LastIndex(line, ":")
+		if idx >= 0 && line[:idx] == account {
 			continue
 		}
 		kept = append(kept, line)
@@ -183,5 +194,37 @@ func (tm *TokenManager) deleteFromFile(account string) error {
 		return os.Remove(path)
 	}
 
-	return os.WriteFile(path, []byte(strings.Join(kept, "\n")+"\n"), 0600)
+	return tm.writeFileAtomically(path, kept)
+}
+
+// readFileLines reads the token file and returns non-empty lines.
+func (tm *TokenManager) readFileLines(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	raw := strings.Split(string(data), "\n")
+	var lines []string
+	for _, line := range raw {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines, nil
+}
+
+// writeFileAtomically writes lines to a file using temp-file-then-rename.
+func (tm *TokenManager) writeFileAtomically(path string, lines []string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+
+	content := strings.Join(lines, "\n") + "\n"
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, []byte(content), 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }
