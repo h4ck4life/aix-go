@@ -63,7 +63,10 @@ func checkRegistry() (bool, string) {
 	if err := registry.Load(); err != nil {
 		return false, err.Error()
 	}
-	providers, _ := registry.GetAll()
+	providers, err := registry.GetAll()
+	if err != nil {
+		return false, fmt.Sprintf("failed to read registry: %v", err)
+	}
 	return true, fmt.Sprintf("%d provider(s) configured", len(providers))
 }
 
@@ -88,6 +91,9 @@ func checkNetwork() (bool, string) {
 		return false, err.Error()
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
 	return true, "OK"
 }
 

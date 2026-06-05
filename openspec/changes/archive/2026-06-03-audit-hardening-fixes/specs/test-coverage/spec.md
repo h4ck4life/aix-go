@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Core package has unit tests
 The `core/` package SHALL have test files covering `registry.go`, `token.go`, and `settings.go` with table-driven tests for all public methods.
@@ -7,10 +7,6 @@ The `core/` package SHALL have test files covering `registry.go`, `token.go`, an
 - **WHEN** `go test ./core/` is run
 - **THEN** tests cover `Load`, `GetAll`, `GetOne`, `SetOne`, `RemoveOne`, `RenameOne`, `SetModelName`, `SetDefaultModel`, `ClearCache`, and cache TTL behavior
 
-#### Scenario: RemoveOne on nonexistent provider
-- **WHEN** `RemoveOne` is called with a name not in the registry
-- **THEN** the test verifies a `ValidationError` is returned (not nil)
-
 #### Scenario: Token manager storage operations
 - **WHEN** `go test ./core/` is run
 - **THEN** tests cover `GetToken`, `SetToken`, `DeleteToken`, `MoveToken`, `HasToken`, `GetStorageInfo` for both keychain and file fallback paths
@@ -18,10 +14,6 @@ The `core/` package SHALL have test files covering `registry.go`, `token.go`, an
 #### Scenario: Settings environment generation
 - **WHEN** `go test ./core/` is run
 - **THEN** tests cover `GenerateEnvironmentVars` (token exclusivity, model aliases, cleanup), `FormatForShell` for all 5 shells, `GetCurrentEnvironment`, `GetCurrentModel`, `GetCurrentProvider`
-
-#### Scenario: FormatForShell deterministic output
-- **WHEN** `FormatForShell` is called multiple times with the same input
-- **THEN** the output is identical across calls (keys sorted alphabetically)
 
 ### Requirement: Crypto package has round-trip tests
 The `crypto/` package SHALL have tests verifying encrypt-decrypt round-trips, padding edge cases, and error handling.
@@ -37,10 +29,6 @@ The `crypto/` package SHALL have tests verifying encrypt-decrypt round-trips, pa
 #### Scenario: Empty plaintext encryption
 - **WHEN** an empty string is encrypted and decrypted
 - **THEN** the round-trip produces an empty string
-
-#### Scenario: Truncated key file error
-- **WHEN** the key file contains fewer than 32 bytes
-- **THEN** `loadOrCreateKey` returns an error with the actual byte count
 
 ### Requirement: Validation package has edge-case tests
 The `validation/` package SHALL have table-driven tests covering valid and invalid inputs for provider names, URLs, token types, and model aliases.
@@ -78,18 +66,3 @@ All file-based tests SHALL use `t.TempDir()` or equivalent to avoid writing to t
 #### Scenario: Registry tests in temp directory
 - **WHEN** registry file operations are tested
 - **THEN** they operate on a temporary `models.json` that is cleaned up after the test
-
-### Requirement: cmd/ package has unit tests
-The `cmd/` package SHALL have test files covering `provider.go`, `config.go`, and `doctor.go` with tests for all `RunE` functions.
-
-#### Scenario: Provider command error paths
-- **WHEN** `go test ./cmd/` is run
-- **THEN** tests cover missing args, invalid names, nonexistent providers, token errors, and successful operations
-
-#### Scenario: Config command flows
-- **WHEN** `go test ./cmd/` is run
-- **THEN** tests cover export roundtrip, import with/without merge, invalid files, and nonexistent files
-
-#### Scenario: Doctor check functions
-- **WHEN** `go test ./cmd/` is run
-- **THEN** tests cover registry check, network check (success, HTTP error, connection error), and permission check

@@ -115,18 +115,13 @@ func runProviderAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	var cfg *constants.ProviderConfig
-	var name string
+	var name, token string
 
 	if providerAddInteractive {
 		var err error
-		var token string
 		name, cfg, token, err = interactive.RunAddProviderWizard()
 		if err != nil {
 			return err
-		}
-		if token != "" {
-			tokenMgr := core.NewTokenManager()
-			_ = tokenMgr.SetToken(name, token)
 		}
 	} else {
 		if len(args) < 2 {
@@ -158,8 +153,17 @@ func runProviderAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Registry write first — only store the token after the provider entry exists.
+	// This avoids orphaned tokens under a name that is not in the registry.
 	if err := registry.SetOne(name, *cfg); err != nil {
 		return err
+	}
+
+	if token != "" {
+		tokenMgr := core.NewTokenManager()
+		if err := tokenMgr.SetToken(name, token); err != nil {
+			return utils.NewTokenError(fmt.Sprintf("provider '%s' added but failed to store token: %v", name, err))
+		}
 	}
 
 	fmt.Println(ui.Success(fmt.Sprintf("Provider '%s' added successfully", name)))
@@ -238,7 +242,9 @@ func runProviderRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	tokenMgr := core.NewTokenManager()
-	_ = tokenMgr.DeleteToken(name)
+	if err := tokenMgr.DeleteToken(name); err != nil {
+		fmt.Println(ui.Warning(fmt.Sprintf("Warning: could not delete token for '%s': %v", name, err)))
+	}
 
 	if err := registry.RemoveOne(name); err != nil {
 		return err
@@ -270,11 +276,20 @@ func runProviderRename(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	tokenMgr := core.NewTokenManager()
-	_ = tokenMgr.MoveToken(oldName, newName)
-
+	// Rename registry first. If this fails, the token is still under oldName
+	// and the user can retry. If we moved the token first and the registry
+	// rename failed, the token would be orphaned under newName.
 	if err := registry.RenameOne(oldName, newName); err != nil {
 		return err
+	}
+
+	tokenMgr := core.NewTokenManager()
+	if err := tokenMgr.MoveToken(oldName, newName); err != nil {
+		// Roll back the registry rename so the provider and token stay aligned.
+		if rbErr := registry.RenameOne(newName, oldName); rbErr != nil {
+			return utils.NewTokenError(fmt.Sprintf("failed to move token from '%s' to '%s': %v (rollback also failed: %v)", oldName, newName, err, rbErr))
+		}
+		return utils.NewTokenError(fmt.Sprintf("failed to move token from '%s' to '%s': %v (rolled back registry rename)", oldName, newName, err))
 	}
 
 	fmt.Println(ui.Success(fmt.Sprintf("Provider renamed from '%s' to '%s'", oldName, newName)))
@@ -321,6 +336,10 @@ func runProviderSetModel(cmd *cobra.Command, args []string) error {
 		return utils.NewValidationError("args", "usage: aix provider set-model <name> <model>")
 	}
 	name, model := args[0], args[1]
+
+	if err := validation.ValidateModelName(model); err != nil {
+		return utils.NewValidationError("model", err.Error())
+	}
 
 	registry := core.NewRegistry()
 	if err := registry.Load(); err != nil {
@@ -394,6 +413,9 @@ func runProviderEdit(cmd *cobra.Command, args []string) error {
 	}
 
 	if providerEditModel != "" {
+		if err := validation.ValidateModelName(providerEditModel); err != nil {
+			return utils.NewValidationError("model", err.Error())
+		}
 		cfg.ModelName = providerEditModel
 		modified = true
 	}

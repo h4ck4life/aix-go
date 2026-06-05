@@ -4,10 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/h4ck4life/aix-go/constants"
 )
+
+var modelNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
 // ValidateProviderName checks if a provider name is valid
 func ValidateProviderName(name string) error {
@@ -74,6 +77,9 @@ func ValidateShell(shell string) error {
 func ValidateModelName(model string) error {
 	if model == "" {
 		return errors.New("model name is required")
+	}
+	if !modelNamePattern.MatchString(model) {
+		return fmt.Errorf("invalid model name '%s': must contain only letters, numbers, dots, hyphens, and underscores", model)
 	}
 	return nil
 }

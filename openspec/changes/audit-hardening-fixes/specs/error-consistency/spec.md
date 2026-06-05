@@ -1,7 +1,7 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: All commands use custom error types for exit codes
-Every command in `cmd/` SHALL return errors wrapped in types from the `utils` error hierarchy (`AixError`, `ValidationError`, `TokenError`, `FileNotFoundError`, `PermissionDeniedError`). Raw `error` values SHALL be wrapped using a generic wrapper that assigns `ExitGeneralError` (exit code 1).
+Every command in `cmd/` SHALL return errors wrapped in types from the `utils` error hierarchy (`AixError`, `ValidationError`, `TokenError`, `FileNotFoundError`, `PermissionDeniedError`). Raw `error` values SHALL be wrapped using a generic wrapper that assigns `ExitGeneralError` (exit code 1). Token operations in `cmd/provider.go` SHALL NOT discard errors with `_ =` — all token storage, deletion, and move errors SHALL be propagated to the caller.
 
 #### Scenario: Doctor check fails
 - **WHEN** a doctor diagnostic check encounters an error
@@ -15,24 +15,14 @@ Every command in `cmd/` SHALL return errors wrapped in types from the `utils` er
 - **WHEN** a provider name fails validation
 - **THEN** a `ValidationError` is returned, producing exit code 2
 
-### Requirement: Generic error wrapper available
-A `utils.WrapError(message string, err error) error` function SHALL be available for wrapping arbitrary errors that don't fit a specific error category. The wrapper SHALL produce an `AixError` with `ExitGeneralError` and include the original error as the `Cause`.
+#### Scenario: Token storage fails during interactive provider add
+- **WHEN** `tokenMgr.SetToken()` returns an error in `runProviderAdd`
+- **THEN** a `TokenError` is returned and the success message is NOT printed
 
-#### Scenario: Wrapping a network error in doctor
-- **WHEN** an HTTP request fails during `checkNetwork`
-- **THEN** the error is wrapped with `WrapError` and has exit code 1
+#### Scenario: Token deletion fails during provider remove
+- **WHEN** `tokenMgr.DeleteToken()` returns an error in `runProviderRemove`
+- **THEN** a warning is printed and the provider is still removed from the registry
 
-#### Scenario: Wrapping a filesystem error
-- **WHEN** an `os.ReadFile` call fails with a permission error
-- **THEN** the error is wrapped with `WrapError` and has exit code 1
-
-### Requirement: Doctor command returns non-zero on failure
-The `runDoctor` function SHALL return an error (not `nil`) when any diagnostic check fails. Currently it always returns `nil`.
-
-#### Scenario: All checks pass
-- **WHEN** all doctor checks succeed
-- **THEN** the command exits with code 0
-
-#### Scenario: One or more checks fail
-- **WHEN** any doctor check fails
-- **THEN** the command returns a wrapped error and exits with code 1
+#### Scenario: Token move fails during provider rename
+- **WHEN** `tokenMgr.MoveToken()` returns an error in `runProviderRename`
+- **THEN** a `TokenError` is returned and the registry rename is NOT performed

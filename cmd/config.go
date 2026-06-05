@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/h4ck4life/aix-go/constants"
 	"github.com/h4ck4life/aix-go/core"
@@ -60,10 +61,16 @@ func runConfigCurrent(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	headers := []string{"Key", "Value"}
 	rows := make([][]string, 0, len(env))
-	for k, v := range env {
-		rows = append(rows, []string{k, v})
+	for _, k := range keys {
+		rows = append(rows, []string{k, env[k]})
 	}
 
 	fmt.Println(ui.RenderSimpleTable(headers, rows))
@@ -103,7 +110,7 @@ func runConfigExport(cmd *cobra.Command, args []string) error {
 	}
 
 	if configExportOutput != "" {
-		if err := os.WriteFile(configExportOutput, data, 0644); err != nil {
+		if err := os.WriteFile(configExportOutput, data, 0600); err != nil {
 			return err
 		}
 		fmt.Println(ui.Success(fmt.Sprintf("Configuration exported to %s", configExportOutput)))
@@ -135,12 +142,19 @@ func runConfigImport(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	existing, _ := registry.GetAll()
+	existing, err := registry.GetAll()
+	if err != nil {
+		return utils.NewValidationError("registry", fmt.Sprintf("failed to read existing providers: %v", err))
+	}
 
 	for name, cfg := range imported {
 		if configImportMerge {
 			if _, ok := existing[name]; ok {
 				fmt.Printf("Merging provider '%s'...\n", name)
+				if err := registry.MergeOne(name, cfg); err != nil {
+					return err
+				}
+				continue
 			}
 		}
 		if err := registry.SetOne(name, cfg); err != nil {

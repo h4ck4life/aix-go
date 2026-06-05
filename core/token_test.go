@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"os"
 	"testing"
 
@@ -116,6 +117,20 @@ func TestTokenMoveNoToken(t *testing.T) {
 	// Moving when no token exists should succeed silently
 	if err := tm.MoveToken("empty-prov", "new-prov"); err != nil {
 		t.Errorf("MoveToken with no token should not error: %v", err)
+	}
+}
+
+func TestTokenGetReturnsErrNotFound(t *testing.T) {
+	setupTempToken(t)
+	tm := newTestTokenManager()
+
+	// GetToken on nonexistent provider should return ErrTokenNotFound, not a generic error
+	_, err := tm.GetToken("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent token")
+	}
+	if !errors.Is(err, ErrTokenNotFound) {
+		t.Errorf("expected ErrTokenNotFound, got: %v", err)
 	}
 }
 

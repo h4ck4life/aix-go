@@ -2,6 +2,7 @@ package core
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,9 @@ import (
 	"github.com/h4ck4life/aix-go/keychain"
 	"github.com/h4ck4life/aix-go/utils"
 )
+
+// ErrTokenNotFound is returned when a token does not exist for a provider
+var ErrTokenNotFound = errors.New("token not found")
 
 // TokenManager handles token storage
 type TokenManager struct {
@@ -68,8 +72,12 @@ func (tm *TokenManager) DeleteToken(providerName string) error {
 	fileErr := tm.deleteFromFile(account)
 	tm.mu.Unlock()
 
-	if keychainErr != nil && fileErr != nil {
-		return utils.NewTokenError(fmt.Sprintf("failed to delete token: keychain=%v, file=%v", keychainErr, fileErr))
+	// Keychain is the primary backend — its errors take priority
+	if keychainErr != nil {
+		return utils.NewTokenError(fmt.Sprintf("failed to delete token from keychain: %v", keychainErr))
+	}
+	if fileErr != nil {
+		return utils.NewTokenError(fmt.Sprintf("failed to delete token from file: %v", fileErr))
 	}
 
 	return nil
@@ -79,8 +87,11 @@ func (tm *TokenManager) DeleteToken(providerName string) error {
 func (tm *TokenManager) MoveToken(oldProvider, newProvider string) error {
 	token, err := tm.GetToken(oldProvider)
 	if err != nil {
-		// No token to move; rename should still succeed
-		return nil
+		if errors.Is(err, ErrTokenNotFound) {
+			// No token to move; rename should still succeed
+			return nil
+		}
+		return fmt.Errorf("failed to read token for '%s': %w", oldProvider, err)
 	}
 
 	if err := tm.SetToken(newProvider, token); err != nil {
@@ -112,6 +123,9 @@ func (tm *TokenManager) getFromFile(account string) (string, error) {
 	path := constants.TokenEncPath()
 	file, err := os.Open(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return "", ErrTokenNotFound
+		}
 		return "", err
 	}
 	defer file.Close()
@@ -130,7 +144,7 @@ func (tm *TokenManager) getFromFile(account string) (string, error) {
 		}
 	}
 
-	return "", utils.NewTokenError(fmt.Sprintf("token not found for %s", account))
+	return "", ErrTokenNotFound
 }
 
 // setInFile stores a token in the encrypted file using a single atomic read-modify-write.

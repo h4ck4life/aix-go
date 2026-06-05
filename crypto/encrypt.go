@@ -116,6 +116,9 @@ func loadOrCreateKey() ([]byte, error) {
 
 	data, err := os.ReadFile(keyPath)
 	if err == nil {
+		if len(data) != 32 {
+			return nil, fmt.Errorf("invalid key file: expected 32 bytes, got %d", len(data))
+		}
 		return data, nil
 	}
 

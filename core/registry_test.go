@@ -296,3 +296,102 @@ func TestRegistryPersistence(t *testing.T) {
 		t.Errorf("persisted BaseURL = %q, want %q", got.BaseURL, cfg.BaseURL)
 	}
 }
+
+func TestRemoveOneNonexistentProvider(t *testing.T) {
+	setupTempRegistry(t)
+
+	r := NewRegistry()
+	if err := r.Load(); err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	err := r.RemoveOne("nonexistent-provider")
+	if err == nil {
+		t.Fatal("expected error for nonexistent provider, got nil")
+	}
+}
+
+func TestRemoveOneExistingProvider(t *testing.T) {
+	setupTempRegistry(t)
+
+	r := NewRegistry()
+	if err := r.Load(); err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	// Add a test provider
+	cfg := constants.ProviderConfig{
+		BaseURL:  "https://test.example.com",
+		TokenVar: constants.TokenTypeAPIKey,
+	}
+	if err := r.SetOne("test-remove", cfg); err != nil {
+		t.Fatalf("SetOne failed: %v", err)
+	}
+
+	// Verify it exists
+	_, err := r.GetOne("test-remove")
+	if err != nil {
+		t.Fatalf("GetOne failed: %v", err)
+	}
+
+	// Remove it
+	if err := r.RemoveOne("test-remove"); err != nil {
+		t.Fatalf("RemoveOne failed: %v", err)
+	}
+
+	// Verify it's gone
+	_, err = r.GetOne("test-remove")
+	if err == nil {
+		t.Fatal("expected error after removal, provider still exists")
+	}
+}
+
+func TestMergeOneWithoutLoad(t *testing.T) {
+	setupTempRegistry(t)
+
+	// Seed registry with two providers
+	r := NewRegistry()
+	if err := r.Load(); err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if err := r.SetOne("a", constants.ProviderConfig{BaseURL: "https://a.example.com", TokenVar: constants.TokenTypeAPIKey}); err != nil {
+		t.Fatalf("SetOne a failed: %v", err)
+	}
+	if err := r.SetOne("b", constants.ProviderConfig{BaseURL: "https://b.example.com", TokenVar: constants.TokenTypeAPIKey}); err != nil {
+		t.Fatalf("SetOne b failed: %v", err)
+	}
+
+	// Pre-count existing providers (includes 5 preconfigured + a + b = 7)
+	existing, err := r.GetAll()
+	if err != nil {
+		t.Fatalf("GetAll failed: %v", err)
+	}
+	preCount := len(existing)
+	if preCount != 7 {
+		t.Fatalf("expected 7 seeded providers, got %d", preCount)
+	}
+
+	// Now make a fresh registry (r.data is nil) and call MergeOne WITHOUT Load.
+	// ensureLoaded() inside MergeOne should load from disk, preserving all existing.
+	fresh := NewRegistry()
+	if err := fresh.MergeOne("c", constants.ProviderConfig{BaseURL: "https://c.example.com", TokenVar: constants.TokenTypeAPIKey}); err != nil {
+		t.Fatalf("MergeOne without Load failed: %v", err)
+	}
+
+	all, err := fresh.GetAll()
+	if err != nil {
+		t.Fatalf("GetAll failed: %v", err)
+	}
+	if len(all) != preCount+1 {
+		t.Errorf("expected %d providers after merge, got %d (ensureLoaded() not called?)", preCount+1, len(all))
+	}
+	if _, ok := all["a"]; !ok {
+		t.Error("provider 'a' was wiped by MergeOne — ensureLoaded() not called?")
+	}
+	if _, ok := all["b"]; !ok {
+		t.Error("provider 'b' was wiped by MergeOne — ensureLoaded() not called?")
+	}
+	if _, ok := all["c"]; !ok {
+		t.Error("provider 'c' was not added by MergeOne")
+	}
+}

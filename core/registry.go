@@ -153,6 +153,52 @@ func (r *Registry) SetOne(name string, cfg constants.ProviderConfig) error {
 	return r.saveLocked()
 }
 
+// MergeOne merges incoming config into existing provider, updating only non-zero fields
+func (r *Registry) MergeOne(name string, incoming constants.ProviderConfig) error {
+	if err := validation.ValidateProviderName(name); err != nil {
+		return err
+	}
+
+	// Load existing data first so a missing Load() doesn't silently wipe the registry.
+	if err := r.ensureLoaded(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.data == nil {
+		r.data = make(map[string]constants.ProviderConfig)
+	}
+
+	existing := r.data[name]
+
+	if incoming.BaseURL != "" {
+		if err := validation.ValidateURL(incoming.BaseURL); err != nil {
+			return err
+		}
+		existing.BaseURL = incoming.BaseURL
+	}
+	if incoming.TokenVar != "" {
+		existing.TokenVar = incoming.TokenVar
+	}
+	if incoming.ModelName != "" {
+		existing.ModelName = incoming.ModelName
+	}
+	if incoming.DefaultModels != nil {
+		if existing.DefaultModels == nil {
+			existing.DefaultModels = make(map[string]string)
+		}
+		for k, v := range incoming.DefaultModels {
+			existing.DefaultModels[k] = v
+		}
+	}
+
+	r.data[name] = existing
+	r.loadedAt = time.Now()
+	return r.saveLocked()
+}
+
 // RemoveOne removes a provider
 func (r *Registry) RemoveOne(name string) error {
 	if err := validation.ValidateProviderName(name); err != nil {
@@ -163,6 +209,9 @@ func (r *Registry) RemoveOne(name string) error {
 	defer r.mu.Unlock()
 
 	if r.data == nil {
+		return utils.NewValidationError("provider", fmt.Sprintf("provider '%s' not found", name))
+	}
+	if _, ok := r.data[name]; !ok {
 		return utils.NewValidationError("provider", fmt.Sprintf("provider '%s' not found", name))
 	}
 	delete(r.data, name)

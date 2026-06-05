@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/h4ck4life/aix-go/constants"
@@ -39,8 +40,10 @@ func shellQuote(shell, value string) string {
 }
 
 // Settings represents Claude Code's settings.json
+// Preserves non-env keys (permissions, hooks, etc.) from the original file
 type Settings struct {
-	Env map[string]string `json:"env,omitempty"`
+	Env map[string]string      `json:"env,omitempty"`
+	Raw map[string]interface{} `json:"-"` // full JSON object; preserved keys go here
 }
 
 // Read reads the settings file
@@ -50,32 +53,53 @@ func (s *Settings) Read() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			s.Env = make(map[string]string)
+			s.Raw = make(map[string]interface{})
 			return nil
 		}
 		return utils.NewFileNotFoundError(path)
 	}
 
-	var settings Settings
-	if err := json.Unmarshal(data, &settings); err != nil {
+	// First unmarshal into raw map to preserve all keys
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return utils.NewValidationError("settings", fmt.Sprintf("failed to parse settings: %v", err))
 	}
+	s.Raw = raw
 
-	if settings.Env == nil {
-		settings.Env = make(map[string]string)
+	// Extract env key into typed map
+	s.Env = make(map[string]string)
+	if envRaw, ok := raw["env"]; ok {
+		if envMap, ok := envRaw.(map[string]interface{}); ok {
+			for k, v := range envMap {
+				if str, ok := v.(string); ok {
+					s.Env[k] = str
+				}
+			}
+		}
 	}
-	*s = settings
+
 	return nil
 }
 
-// Write writes the settings file
+// Write writes the settings file, preserving non-env keys from the original
 func (s *Settings) Write() error {
 	path := constants.SettingsPath()
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
 
+	// Merge current Env back into Raw
+	if s.Raw == nil {
+		s.Raw = make(map[string]interface{})
+	}
+	envMap := make(map[string]interface{}, len(s.Env))
+	for k, v := range s.Env {
+		envMap[k] = v
+	}
+	s.Raw["env"] = envMap
+
 	tmpPath := path + ".tmp"
-	data, err := json.MarshalIndent(s, "", "  ")
+	data, err := json.MarshalIndent(s.Raw, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -131,20 +155,27 @@ func (s *Settings) GenerateEnvironmentVars(providerName string, provider constan
 	return nil
 }
 
-// FormatForShell outputs shell export commands
+// FormatForShell outputs shell export commands with deterministic key ordering
 func (s *Settings) FormatForShell(shell string) string {
+	keys := make([]string, 0, len(s.Env))
+	for key := range s.Env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
 	var sb strings.Builder
-	for key, value := range s.Env {
+	for _, key := range keys {
+		value := s.Env[key]
 		quoted := shellQuote(shell, value)
 		switch shell {
 		case constants.ShellFish:
-			sb.WriteString(fmt.Sprintf("set -x %s %s\n", key, quoted))
+			fmt.Fprintf(&sb, "set -x %s %s\n", key, quoted)
 		case constants.ShellPowerShell:
-			sb.WriteString(fmt.Sprintf("$env:%s = %s\n", key, quoted))
+			fmt.Fprintf(&sb, "$env:%s = %s\n", key, quoted)
 		case constants.ShellCmd:
-			sb.WriteString(fmt.Sprintf("set %s=%s\n", key, quoted))
+			fmt.Fprintf(&sb, "set %s=%s\n", key, quoted)
 		default:
-			sb.WriteString(fmt.Sprintf("export %s=%s\n", key, quoted))
+			fmt.Fprintf(&sb, "export %s=%s\n", key, quoted)
 		}
 	}
 	return sb.String()
@@ -168,7 +199,7 @@ func (s *Settings) GetCurrentProvider() string {
 	return s.Env[constants.EnvAnthropicBaseURL]
 }
 
-// Reset clears all settings
+// Reset clears only the env key, preserving other settings
 func (s *Settings) Reset() error {
 	s.Env = make(map[string]string)
 	return s.Write()

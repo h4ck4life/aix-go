@@ -1,98 +1,82 @@
 ## Context
 
-`aix` is a Go CLI tool (~3K lines across 24 files) that switches between Anthropic-compatible API providers. It was ported from a Node.js version and has not had a hardening pass. A multi-agent audit found 30 issues across correctness, consistency, security, and test coverage. The codebase is well-structured (Cobra commands, Bubble Tea UI, sync.RWMutex-protected registry) but has specific weak points in concurrency, crypto, shell escaping, and error handling. 14 of 15 packages have zero tests.
+The aix-go CLI tool manages API provider configurations and tokens for Claude Code. An audit uncovered systemic issues where operations silently succeed even when they fail — token errors discarded with `_ =`, registry deletes no-op on missing keys, and settings writes destroying unrelated Claude Code config. The codebase has 0 test coverage on `cmd/` handlers, meaning these bugs have no regression safety net.
 
-The tool handles sensitive data (API tokens) and generates shell commands evaluated via `eval $(aix provider use ...)`, making correctness in concurrency, encryption, and shell escaping critical.
+The change spans 7 source files and adds 3 new test files. No external dependencies are added.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Eliminate all high-severity correctness bugs (race conditions, error swallowing)
-- Fix the padding oracle vulnerability in AES-256-CBC decryption
-- Complete shell escaping for all 5 supported shells, especially CMD and PowerShell
-- Achieve consistent error wrapping across all commands using the existing `utils` error hierarchy
-- Add unit test coverage for `core/`, `crypto/`, `validation/`, `constants/`, and `core/settings.go`
-- Add `dist/` to `.gitignore`
+- Every user-facing operation returns honest success/failure status
+- Settings file writes preserve non-aix configuration keys
+- `config import --merge` actually merges instead of always overwriting
+- Doctor diagnostics give accurate results (no false positives)
+- cmd/ handlers have unit test coverage for error paths and happy paths
+- Crypto key loading validates key integrity before use
+- Map iteration produces deterministic output
 
 **Non-Goals:**
-- Rewriting the encryption scheme (e.g., switching from CBC to GCM) — fix the oracle, don't redesign
-- Adding integration or end-to-end tests in this change
-- Changing the CLI interface or config file format
-- Adding new features or commands
-- Fixing low-severity nits (doctor network check granularity, table bounds that can't be hit in practice)
+- Migrating from AES-CBC to AES-GCM (separate change — threat model is local-only)
+- Adding `--json` output flags or shell completion (UX feature, not a bug fix)
+- Adding `--token` flag to non-interactive `provider add` (feature request)
+- Fixing Unicode display width in table padding (cosmetic, low priority)
 
 ## Decisions
 
-### 1. Token file atomicity: read-modify-write under write lock
+### 1. Error propagation: return vs warn-and-continue
 
-**Current:** `setInFile` calls `deleteFromFile` (reads entire file, rewrites without the account) then opens the file again in append mode. The delete error is swallowed.
+**Decision**: All 3 silent-error sites in `cmd/provider.go` will return the error (not just warn).
 
-**Decision:** Replace the delete-then-append pattern with a single read-modify-write under the existing mutex. Read all lines, replace or append the target entry, write the entire file atomically (temp + rename, same pattern as `registry.saveLocked`).
+**Rationale**: `SetToken` failure during `provider add` means the provider is useless — returning an error prevents the success message from misleading the user. Same for `DeleteToken` during remove and `MoveToken` during rename. A warning alone would let the operation complete with a lie.
 
-**Rationale:** The current two-step approach can lose the token if the process crashes between delete and append. A single atomic write eliminates this window. The mutex already serializes access, so there's no performance concern.
+**Alternative considered**: Log a warning and continue. Rejected because the user sees "success" and has no indication the operation was incomplete.
 
-**Alternative considered:** Using `fcntl`/`flock` file locking — rejected because it adds OS-specific complexity for a single-user CLI tool where the in-process mutex is sufficient.
+### 2. RemoveOne existence check: before delete, not after
 
-### 2. Registry RenameOne: already safe under write lock
+**Decision**: Check `r.data[name]` existence before calling `delete()`, return `ValidationError` if missing.
 
-**Current:** `RenameOne` acquires write lock, checks existence, deletes old key, sets new key. All under `r.mu.Lock()`.
+**Rationale**: `delete()` on missing key is a no-op in Go, so the only way to detect "nothing happened" is to check first. This is consistent with how `RenameOne` already handles missing providers (lines 189-191 of `registry.go`).
 
-**Decision:** No code change needed. The audit flagged this as a concern, but re-reading the code: the entire operation is within a single `Lock()/Unlock()` block at `registry.go:181-196`. Concurrent calls are properly serialized. Mark as verified-safe.
+### 3. DeleteToken: return first non-nil error
 
-### 3. Padding oracle: constant-time validation
+**Decision**: If keychain deletion fails, return that error regardless of file deletion result. Only return nil if keychain succeeds (or keychain is unavailable).
 
-**Current:** `crypto/encrypt.go:73-81` validates PKCS7 padding by checking each byte. If any byte is wrong, it returns immediately, creating a timing side-channel.
+**Rationale**: The current `&&` logic treats "keychain failed but file succeeded" as success, which means the token is still accessible via keychain. The user believes the token is deleted. The keychain is the primary store — its errors take priority.
 
-**Decision:** Use `subtle.ConstantTimeCompare` or a constant-time byte-by-byte check that always compares all padding bytes regardless of mismatches. Return a single generic "decryption failed" error (no distinction between "bad padding" and "ciphertext too short").
+### 4. Settings preservation: raw JSON round-trip
 
-**Rationale:** While a local attacker with write access to `tokens.enc` is an unlikely threat model for a CLI tool, the fix is trivial and follows defense-in-depth. The Go `crypto/subtle` package is stdlib — no new dependency.
+**Decision**: `Settings.Read()` unmarshals into `map[string]interface{}` first, extracts only `env`, and stores the full map. `Settings.Write()` merges `env` back into the stored map and marshals. `Reset()` only clears the `env` key.
 
-### 4. Shell escaping: use `shellescape`-style for POSIX, proper escaping for CMD and PowerShell
+**Rationale**: Claude Code's `settings.json` may contain `permissions`, `hooks`, and other keys we don't control. The current `Settings` struct with only `Env` field causes `json.Unmarshal` to discard unknown fields, and `json.Marshal` to write only `Env`. We need to preserve unknown fields.
 
-**Current:** POSIX shells get single-quote escaping (correct). PowerShell escapes only `"`. CMD does no escaping at all.
+**Alternative considered**: Using `json.RawMessage` for unknown fields. More complex, same result. The raw map approach is simpler for a single-file settings format.
 
-**Decision:**
-- **bash/zsh/fish:** Keep existing single-quote escaping — it's correct for POSIX shells.
-- **CMD:** Use `^` escaping for special characters (`& | < > ^ "`) and wrap in double quotes.
-- **PowerShell:** Use single-quote wrapping (like POSIX) since PowerShell single quotes are literal strings. For values containing single quotes, use the `''` escape (double-single-quote) pattern.
+### 5. Config import merge: field-level merge on conflict
 
-**Rationale:** PowerShell's single-quote strings are simpler and safer than backtick-escaping inside double quotes. CMD has limited escaping capability, but `^` before metacharacters covers the attack surface.
+**Decision**: When `--merge` is true and a provider name exists in both current and imported configs, merge field-by-field: imported values overwrite existing values, but fields not present in the imported config preserve existing values.
 
-**Alternative considered:** Using a third-party shell-escaping library — rejected to avoid new dependencies for a bounded problem.
+**Rationale**: This is the expected merge behavior — imported config is the "source of truth" for fields it specifies, but doesn't wipe unspecified fields.
 
-### 5. Error consistency: wrap all raw errors in cmd/ through utils types
+### 6. Test strategy for cmd/ handlers
 
-**Current:** `cmd/doctor.go` returns raw errors. Other commands mostly use the custom types. `main.go` calls `utils.GetExitCode(err)` which defaults to exit code 1 for non-`AixError` types.
+**Decision**: Test cmd/ handlers by directly calling the `RunE` functions with mock `cobra.Command` and args. Use real `core.Registry` with temp directories (no interface mocking needed since registry writes to a known path).
 
-**Decision:** Add a utility function `utils.WrapError(message string, err error) error` that wraps any error in a generic `AixError` with `ExitGeneralError`. Use it in `doctor.go` and audit all other `cmd/` files for bare error returns.
+**Rationale**: The `RunE` functions accept `*cobra.Command` and `[]string` — we can construct these directly. Using temp directories for `~/.anthropic-switch/` and `~/.aix/` gives realistic tests without mocking file I/O. This is simpler than introducing interfaces for Registry and TokenManager.
 
-**Rationale:** The custom error hierarchy already exists and works. We just need to use it consistently. Adding a generic wrapper is cleaner than choosing specific error types for diagnostic failures.
+### 7. Deterministic map iteration: sort keys
 
-### 6. Test infrastructure: interfaces + table-driven tests, no external deps
+**Decision**: Collect map keys into a slice, `sort.Strings()`, then iterate in sorted order. Apply this in `FormatForShell` and `config current`.
 
-**Decision:** Use Go's built-in `testing` package with table-driven tests. For keychain/file dependencies, use interfaces + mocks (hand-written, no mockgen). Create a `testutil` package with temp-directory helpers.
-
-**Rationale:** The codebase currently has no test dependencies. Adding `testify` or `mockgen` would be a philosophical shift. Go stdlib is sufficient for this codebase size. Interfaces are already partially there (keychain wraps `go-keyring`).
-
-### 7. Keychain availability check: use random-ish account name
-
-**Current:** `IsAvailable()` uses a fixed test account `aix-test-0`. Two concurrent `aix` processes would clobber each other.
-
-**Decision:** Include the PID in the test account name: `aix-test-{pid}`. This is deterministic per-process and unique across concurrent invocations.
-
-**Rationale:** PID is available, unique per process, and doesn't require importing `crypto/rand` into the keychain package. Process collision (PID reuse) within the microseconds of the test is negligible.
+**Rationale**: Simple, idiomatic Go, zero dependencies. Alphabetical order is predictable and debuggable.
 
 ## Risks / Trade-offs
 
-| Risk | Mitigation |
-|------|-----------|
-| Rewriting `setInFile` could introduce new bugs in token storage | Encrypt/decrypt round-trip tests before and after; test with existing `tokens.enc` files |
-| CMD escaping is inherently limited — some characters cannot be escaped in all contexts | Document the limitation; the primary use case (URLs and API keys) doesn't typically contain CMD metacharacters |
-| Changing error types in `doctor.go` changes its exit code from 0-on-failure to 1-on-failure | This is actually a bug fix — doctor currently returns `nil` even when checks fail |
-| Tests using interfaces require refactoring `keychain` and file ops behind interfaces | Minimal refactoring — only what's needed for testability |
-| Constant-time padding check has micro-performance cost | Negligible for a CLI tool that decrypts a handful of tokens |
+- **[Risk] Settings round-trip may reformat JSON**: Preserving unknown fields via `map[string]interface{}` may change whitespace or key ordering in `settings.json`. → **Mitigation**: Use `json.MarshalIndent` with same indent as Claude Code uses. Minor formatting differences are acceptable.
 
-## Open Questions
+- **[Risk] RemoveOne breaking change for callers**: Any code that calls `RemoveOne` on a nonexistent provider now gets an error. → **Mitigation**: Only `runProviderRemove` calls it, and it always loads the registry first. The only scenario is "user types a wrong name" — returning an error is the correct behavior.
 
-- Should `dist/` be added to `.gitignore` or should the entire directory be removed from tracking? (Currently untracked per git status, but worth confirming intent)
-- Should we bump the module version after hardening, or is this a patch-level change?
+- **[Risk] cmd/ tests depend on temp directory setup**: Tests that create temp dirs for registry/token paths must clean up. → **Mitigation**: Use `t.TempDir()` which auto-cleans. Override path constants in test setup.
+
+- **[Trade-off] MoveToken atomicity**: True atomicity would require a single locked transaction. Current fix (reorder to set-then-delete) still has a window if process crashes between operations. → **Acceptable**: This is a CLI tool, not a distributed system. Crash-safe atomicity would require a WAL or journal, which is overkill.
+
+- **[Trade-off] Doctor network check may be slow**: Adding status code check doesn't change latency (already waits for response). But the 5-second timeout is the real cost. → **No change needed**: Already acceptable for a diagnostic command.

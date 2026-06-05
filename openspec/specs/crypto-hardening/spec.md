@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: PKCS7 padding validation is constant-time
 The `Decrypt` function in `crypto/encrypt.go` SHALL validate PKCS7 padding using a constant-time comparison that does not short-circuit on the first invalid byte. The function SHALL always compare all padding bytes regardless of individual mismatches.
@@ -25,18 +25,3 @@ All error returns from `Decrypt` for invalid ciphertext, bad padding, or incorre
 #### Scenario: Base64 decode failure
 - **WHEN** a non-base64 string is passed to `Decrypt`
 - **THEN** the base64 error is wrapped with a generic message, not returned verbatim
-
-### Requirement: Key file is validated for length after loading
-The `loadOrCreateKey` function SHALL validate that the key file content is exactly 32 bytes. If the file is shorter or longer, the function SHALL return an error with the format "invalid key file: expected 32 bytes, got N".
-
-#### Scenario: Key file with correct length
-- **WHEN** `~/.aix/key` contains exactly 32 bytes
-- **THEN** the key is returned without error
-
-#### Scenario: Key file too short
-- **WHEN** `~/.aix/key` contains 16 bytes
-- **THEN** an error is returned indicating the file has 16 bytes instead of 32
-
-#### Scenario: Key file too long
-- **WHEN** `~/.aix/key` contains 64 bytes
-- **THEN** an error is returned indicating the file has 64 bytes instead of 32

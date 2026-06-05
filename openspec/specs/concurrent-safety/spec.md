@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Token file writes are atomic
 The `setInFile` method SHALL perform a single read-modify-write cycle under the existing `sync.RWMutex`. It SHALL read all lines from the encrypted token file, replace or append the target entry, and write the complete file atomically using a temp-file-then-rename pattern. The method SHALL NOT use a separate delete-then-append sequence.
@@ -35,14 +35,3 @@ The `RenameOne` method performs its check-delete-set sequence under a write lock
 #### Scenario: Concurrent rename operations on different providers
 - **WHEN** two goroutines call `RenameOne` with different old names simultaneously
 - **THEN** both operations complete correctly, serialized by the write lock
-
-### Requirement: MoveToken uses set-then-delete ordering
-The `MoveToken` method SHALL set the token under the new provider name before deleting the old token. This minimizes the window where the token exists under neither name if the process is interrupted.
-
-#### Scenario: Move succeeds completely
-- **WHEN** `MoveToken("old", "new")` is called and all operations succeed
-- **THEN** the token is accessible under "new" and NOT accessible under "old"
-
-#### Scenario: Move interrupted after set but before delete
-- **WHEN** the process crashes after `SetToken("new", token)` but before `DeleteToken("old")`
-- **THEN** the token is accessible under "new" (duplicate under "old" is acceptable — prefer data loss over losing the token entirely)

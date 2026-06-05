@@ -71,6 +71,8 @@ func TestEncryptProducesDifferentCiphertexts(t *testing.T) {
 }
 
 func TestDecryptInvalidInputs(t *testing.T) {
+	setupTempKeyDir(t) // ensure valid key exists for these tests
+
 	tests := []struct {
 		name       string
 		ciphertext string
@@ -124,5 +126,65 @@ func TestLoadOrCreateKey(t *testing.T) {
 	}
 	if string(key1) != string(key2) {
 		t.Error("second load should return the same key")
+	}
+}
+
+func TestLoadKeyTruncatedFile(t *testing.T) {
+	tmpDir := setupTempKeyDir(t)
+	keyPath := filepath.Join(tmpDir, ".aix", "key")
+
+	// Create truncated key file (16 bytes instead of 32)
+	os.MkdirAll(filepath.Dir(keyPath), 0700)
+	os.WriteFile(keyPath, make([]byte, 16), 0600)
+
+	_, err := loadOrCreateKey()
+	if err == nil {
+		t.Fatal("expected error for truncated key file")
+	}
+	if err.Error() != "invalid key file: expected 32 bytes, got 16" {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestLoadKeyOversizedFile(t *testing.T) {
+	tmpDir := setupTempKeyDir(t)
+	keyPath := filepath.Join(tmpDir, ".aix", "key")
+
+	// Create oversized key file (64 bytes instead of 32)
+	os.MkdirAll(filepath.Dir(keyPath), 0700)
+	os.WriteFile(keyPath, make([]byte, 64), 0600)
+
+	_, err := loadOrCreateKey()
+	if err == nil {
+		t.Fatal("expected error for oversized key file")
+	}
+	if err.Error() != "invalid key file: expected 32 bytes, got 64" {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestLoadKeyValidFile(t *testing.T) {
+	tmpDir := setupTempKeyDir(t)
+	keyPath := filepath.Join(tmpDir, ".aix", "key")
+
+	// Create valid 32-byte key file
+	expectedKey := make([]byte, 32)
+	for i := range expectedKey {
+		expectedKey[i] = byte(i)
+	}
+	os.MkdirAll(filepath.Dir(keyPath), 0700)
+	os.WriteFile(keyPath, expectedKey, 0600)
+
+	key, err := loadOrCreateKey()
+	if err != nil {
+		t.Fatalf("loadOrCreateKey failed: %v", err)
+	}
+	if len(key) != 32 {
+		t.Errorf("key length = %d, want 32", len(key))
+	}
+	for i := range expectedKey {
+		if key[i] != expectedKey[i] {
+			t.Errorf("key[%d] = %d, want %d", i, key[i], expectedKey[i])
+		}
 	}
 }
